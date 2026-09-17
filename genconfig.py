@@ -1,5 +1,6 @@
 import os
 import json
+from datetime import datetime
 
 
 def load_subs():
@@ -8,6 +9,17 @@ def load_subs():
             return json.load(f)
     except Exception:
         return {}
+
+
+def parse_expiry(exp_str):
+    """تحويل تاريخ DD/MM/YYYY إلى Unix Timestamp"""
+    try:
+        dt = datetime.strptime(str(exp_str).strip(), "%d/%m/%Y")
+        # نهاية اليوم
+        dt = dt.replace(hour=23, minute=59, second=59)
+        return int(dt.timestamp())
+    except Exception:
+        return None
 
 
 def main():
@@ -27,11 +39,18 @@ def main():
             continue
         if not bool(s.get("active", True)):
             continue
+
         users[name] = secret
+
+        # تحويل التاريخ إلى Timestamp
         if s.get("expiry"):
-            exp[name] = str(s["expiry"])
+            ts = parse_expiry(s["expiry"])
+            if ts:
+                exp[name] = ts
+
         if s.get("ip"):
             ips[name] = str(s["ip"])
+
         conns[name] = 4
 
     admin = os.environ.get("SECRET", "c7b105c8829e465a542b58d61d1d235f")
@@ -39,21 +58,23 @@ def main():
 
     port = int(os.environ.get("PORT", "443"))
 
-    cfg = """PORT = %d
+    cfg = f"""PORT = {port}
 
-USERS = %s
+USERS = {json.dumps(users, indent=4)}
 
-USER_EXPIRATIONS = %s
+USER_EXPIRATIONS = {json.dumps(exp, indent=4)}
 
-USER_ALLOWED_IPS = %s
+USER_ALLOWED_IPS = {json.dumps(ips, indent=4)}
 
-USER_MAX_TCP_CONNS = %s
+USER_MAX_TCP_CONNS = {json.dumps(conns, indent=4)}
 
-MODES = {
+MODES = {{
     "classic": False,
     "secure": False,
     "tls": True,
-}
+}}
+
+TLS_DOMAIN = "www.google.com"
 
 FAST_MODE = True
 PREFER_IPV6 = False
@@ -64,13 +85,7 @@ TO_TG_BUFSIZE = 1048576
 TG_CONNECT_TIMEOUT = 100
 TG_READ_TIMEOUT = 100
 CLIENT_HANDSHAKE_TIMEOUT = 100
-""" % (
-        port,
-        json.dumps(users, indent=4),
-        json.dumps(exp, indent=4),
-        json.dumps(ips, indent=4),
-        json.dumps(conns, indent=4),
-    )
+"""
 
     with open("config.py", "w", encoding="utf-8") as f:
         f.write(cfg)
