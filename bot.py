@@ -22,14 +22,14 @@ TLS_DOMAIN_HEX = "7777772e676f6f676c652e636f6d"
 
 OWNER_HELP = ("أوامر التحكم (خاصة بالمالك)\n\n"
     "الكل — عرض قائمة كل المشتركين والإحصائيات\n"
-    "بحث اسم — البحث عن مشترك برابطه/يوزره\n"
-    "اضف اسم عدد-الأيام — إضافة مشترك جديد\n"
-    "تعديل اسم عدد-الأيام — تعديل مدة الاشتراك\n"
-    "وقف اسم — إيقاف مشترك\n"
-    "تفعيل اسم — إعادة تفعيل المشترك\n"
-    "ربط اسم ip — ربط عنوان IP بمشترك\n"
-    "معلومات اسم — عرض تفاصيل مشترك\n"
-    "حذف اسم — حذف المشترك نهائياً")
+    "بحث يوزر — البحث عن مشترك باليوزر\n"
+    "اضف يوزر عدد-الأيام — إضافة مشترك جديد\n"
+    "تعديل يوزر عدد-الأيام — تعديل مدة الاشتراك\n"
+    "وقف يوزر — إيقاف مشترك\n"
+    "تفعيل يوزر — إعادة تفعيل المشترك\n"
+    "ربط يوزر ip — ربط عنوان IP بمشترك\n"
+    "معلومات يوزر — عرض تفاصيل مشترك\n"
+    "حذف يوزر — حذف المشترك نهائياً")
 
 
 def load():
@@ -111,15 +111,15 @@ def public_menu():
         "اضغط الزر واجرب يومين مجانية") % (PRICE, CONTACT)
 
 
-def fmt_sub(name, s):
+def fmt_sub(username, s):
     status = "🟢 مفعل" if s.get("active", True) else "🔴 موقوف"
-    lines = ["الاسم: %s" % name,
+    lines = ["اليوزر: @%s" % username,
              "الحالة: %s" % status,
              "ينتهي: %s" % s.get("expiry", "-"),
              "IP: %s" % s.get("ip", "غير مربوط")]
     if s.get("secret"):
         lines.append("")
-        lines.append("لينك البروكسي:")
+        lines.append("رابط البروكسي:")
         lines.append(proxy_link(s["secret"]))
     return "\n".join(lines)
 
@@ -131,11 +131,10 @@ def grant_trial(chat_id, user_from):
     if uid in free_used:
         send(chat_id, "لقد استعملت الفترة المجانية سابقًا، وما تكدر تكررها. للاشتراك تواصل مع المطور:\n%s" % CONTACT)
         return
-    username = user_from.get("username")
-    name = ("trial_" + username) if username else ("trial_user" + str(uid))
+    raw_username = user_from.get("username")
+    username = raw_username.lower() if raw_username else ("user_" + str(uid))
     subs = db.setdefault("subscribers", {})
-    if name in subs:
-        name = name + "_" + str(int(time.time()))
+    
     sub = {
         "secret": secrets.token_hex(16),
         "plan": "2d مجانية",
@@ -146,11 +145,11 @@ def grant_trial(chat_id, user_from):
         "trial": True,
         "tg_id": uid,
     }
-    subs[name] = sub
+    subs[username] = sub
     free_used.append(uid)
     save(db)
     text = ("🎁 مبروك! يومين مجانية لك\n\n"
-        "اللينك:\n%s\n\n"
+        "رابط الاتصال:\n%s\n\n"
         "ينتهي: %s\n\n"
         "💎 الاشتراك الشهري: %s\n"
         "للاستشارة والتثبيت بشكل دائم تواصل مع المطور:\n%s") % (proxy_link(sub["secret"]), sub["expiry"], PRICE, CONTACT)
@@ -187,44 +186,44 @@ def owner_handle(chat_id, text):
             return
 
         lines = [
-            "%s %s — حتى %s" % ("🟢" if s.get("active", True) else "🔴", name, s.get("expiry", "-"))
-            for name, s in subs.items()
+            "%s @%s — حتى %s" % ("🟢" if s.get("active", True) else "🔴", user, s.get("expiry", "-"))
+            for user, s in subs.items()
         ]
         send(chat_id, header + "\n".join(lines))
         return
 
     if cmd in ("بحث", "search"):
         if not args:
-            send(chat_id, "يرجى كتابة الاسم للبحث. مثال: بحث علي")
+            send(chat_id, "يرجى كتابة اليوزر للبحث. مثال: بحث @username")
             return
         query = args[0].lstrip("@").lower()
         subs = db.get("subscribers", {})
-        results = [name for name in subs if query in name.lower()]
+        results = [user for user in subs if query in user.lower()]
 
         if not results:
-            send(chat_id, "لم يتم العثور على أي مشترك يحتوي على: " + query)
+            send(chat_id, "لم يتم العثور على أي مشترك باليوزر: " + query)
             return
 
         lines = [
-            "%s %s — ينتهي: %s" % ("🟢" if subs[name].get("active", True) else "🔴", name, subs[name].get("expiry", "-"))
-            for name in results
+            "%s @%s — ينتهي: %s" % ("🟢" if subs[user].get("active", True) else "🔴", user, subs[user].get("expiry", "-"))
+            for user in results
         ]
         send(chat_id, "🔎 نتائج البحث (%d):\n\n%s" % (len(results), "\n".join(lines)))
         return
 
     if cmd in ("اضف", "أضف", "add", "تعديل", "plan"):
         if len(args) < 1:
-            send(chat_id, "استخدام: اضف اسم [عدد الأيام]")
+            send(chat_id, "استخدام: اضف @username [عدد الأيام]")
             return
-        name = args[0].lstrip("@")
-        days = parse_days(args[1]) if len(args) > 1 else 2
+        username = args[0].lstrip("@").lower()
+        days = parse_days(args[1]) if len(args) > 1 else 30
         if days is None:
             send(chat_id, "المدة غير صحيحة.")
             return
         subs = db.setdefault("subscribers", {})
         if cmd in ("اضف", "أضف", "add"):
-            if name in subs:
-                send(chat_id, "الاسم مسجل مسبقاً. استخدم أمر (معلومات اسم) للتفاصيل.")
+            if username in subs:
+                send(chat_id, "اليوزر مسجل مسبقاً. استخدم أمر (معلومات @username) للتفاصيل.")
                 return
             sub = {
                 "secret": secrets.token_hex(16),
@@ -234,39 +233,39 @@ def owner_handle(chat_id, text):
                 "active": True,
                 "created": expiry_str(0),
             }
-            subs[name] = sub
+            subs[username] = sub
             save(db)
-            send(chat_id, "تم التسجيل بنجاح:\n\n" + fmt_sub(name, sub))
+            send(chat_id, "تم التسجيل بنجاح:\n\n" + fmt_sub(username, sub))
         else:
-            sub = subs.get(name)
+            sub = subs.get(username)
             if not sub:
-                send(chat_id, "هذا المشترك غير مسجل.")
+                send(chat_id, "هذا اليوزر غير مسجل.")
                 return
             sub["plan"] = "%dd" % days
             sub["expiry"] = expiry_str(days)
             save(db)
-            send(chat_id, "تم تعديل مدة %s — تنتهي %s" % (name, sub["expiry"]))
+            send(chat_id, "تم تعديل مدة @%s — تنتهي %s" % (username, sub["expiry"]))
         return
 
     if cmd in ("وقف", "تفعيل", "ربط", "معلومات", "حذف", "stop", "on", "ip", "info", "del"):
         if not args:
-            send(chat_id, "استخدام: %s اسم" % cmd)
+            send(chat_id, "استخدام: %s @username" % cmd)
             return
-        name = args[0].lstrip("@")
+        username = args[0].lstrip("@").lower()
         subs = db.get("subscribers", {})
-        sub = subs.get(name)
+        sub = subs.get(username)
         if not sub:
-            send(chat_id, "الاسم %s غير مسجل." % name)
+            send(chat_id, "اليوزر @%s غير مسجل." % username)
             return
 
         if cmd in ("وقف", "stop"):
             sub["active"] = False
             save(db)
-            send(chat_id, "تم إيقاف %s." % name)
+            send(chat_id, "تم إيقاف @%s." % username)
         elif cmd in ("تفعيل", "on"):
             sub["active"] = True
             save(db)
-            send(chat_id, "تم تفعيل %s." % name)
+            send(chat_id, "تم تفعيل @%s." % username)
         elif cmd in ("ربط", "ip"):
             ip = args[1] if len(args) > 1 else ""
             if ip and not re.match(r"^[0-9a-fA-F:.]{3,45}$", ip):
@@ -274,13 +273,13 @@ def owner_handle(chat_id, text):
                 return
             sub["ip"] = ip
             save(db)
-            send(chat_id, "تم ربط %s بالـ IP: %s" % (name, ip if ip else "— (مسح الربط)"))
+            send(chat_id, "تم ربط @%s بالـ IP: %s" % (username, ip if ip else "— (مسح الربط)"))
         elif cmd in ("معلومات", "info"):
-            send(chat_id, fmt_sub(name, sub))
+            send(chat_id, fmt_sub(username, sub))
         elif cmd in ("حذف", "del"):
-            del subs[name]
+            del subs[username]
             save(db)
-            send(chat_id, "تم حذف %s نهائياً." % name)
+            send(chat_id, "تم حذف @%s نهائياً." % username)
         return
 
 
