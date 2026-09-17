@@ -1,14 +1,8 @@
 #!/bin/sh
-set -e
 
-# إنشاء المجلد للبيانات إن لم يكن موجوداً
-mkdir -p /data
+# تشغيل خادم MTProxy في الخلفية على المنفذ 443
+# (أو أمر تشغيل خادم البروكسي المعتمد في مشروعك)
+./mtproxy -p 443 -s $SECRET -H 443 --tls google.com &
 
-# توليد إعدادات البروكسي الأولية
-python3 /app/genconfig.py
-
-# تشغيل بوت التلكرام في الخلفية
-python3 /app/bot.py &
-
-# تشغيل خادم البروكسي الأساسي
-exec python3 mtprotoproxy.py
+# تشغيل بوت الإدارة
+python3 bot.py
