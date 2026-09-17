@@ -47,6 +47,13 @@ def save(db):
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(db, f, ensure_ascii=False, indent=2)
     os.replace(tmp, DATA)
+    
+    # إعادة توليد config.py وإنهاء عملية البروكسي الحالية ليعاد تشغيلها تلقائياً
+    try:
+        os.system("python3 /app/genconfig.py")
+        os.system("pkill -f mtprotoproxy.py")
+    except Exception as e:
+        print("Error reloading proxy config:", e)
 
 
 def api(method, **params):
