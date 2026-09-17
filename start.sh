@@ -1,8 +1,10 @@
 #!/bin/sh
 
-# تشغيل خادم MTProxy في الخلفية على المنفذ 443
-# (أو أمر تشغيل خادم البروكسي المعتمد في مشروعك)
-./mtproxy -p 443 -s $SECRET -H 443 --tls google.com &
+# 1. توليد ملف config.py الخاص بالبروكسي من المتغيرات
+python3 genconfig.py
 
-# تشغيل بوت الإدارة
+# 2. تشغيل خادم mtprotoproxy في الخلفية
+python3 mtprotoproxy.py config.py &
+
+# 3. تشغيل بوت الإدارة
 python3 bot.py
