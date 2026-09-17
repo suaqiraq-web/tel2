@@ -1,10 +1,14 @@
 #!/bin/sh
-set -eu
+set -e
 
-export PORT="${PORT:-443}"
+# إنشاء المجلد للبيانات إن لم يكن موجوداً
 mkdir -p /data
-[ -f /data/subs.json ] || printf '%s\n' '{"admin_id": null, "subscribers": {}, "free_used": []}' > /data/subs.json
 
+# توليد إعدادات البروكسي الأولية
 python3 /app/genconfig.py
+
+# تشغيل بوت التلكرام في الخلفية
 python3 /app/bot.py &
-exec python3 /app/mtprotoproxy.py
+
+# تشغيل خادم البروكسي الأساسي
+exec python3 mtprotoproxy.py
